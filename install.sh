@@ -86,7 +86,6 @@ ensure_dir_perms() {
   chmod 700 "${DATA_DIR}"
 }
 
-# Robust fingerprint read (supports "Unnamed <FP>" or "<FP>")
 read_fingerprint() {
   local fp=""
   if [[ -s "${FINGERPRINT_FILE}" ]]; then
@@ -118,7 +117,7 @@ extract_cert_iat() {
   echo "${cert}|${iat}"
 }
 
-# ---------- choose port ----------
+
 PORT_CANDIDATES_STR="${PORT_CANDIDATES:-8443 9443 10443 12443 14443 16443 18443}"
 read -r -a PORT_CANDIDATES <<< "${PORT_CANDIDATES_STR}"
 
@@ -129,13 +128,13 @@ else
   log "Auto-selected free bridge port: ${BRIDGE_PORT}"
 fi
 
-# ---------- apt install ----------
+
 wait_for_apt_lock
 log "Installing packages (tor, obfs4proxy, ufw, curl)..."
 apt-get update -y
 apt-get install -y tor obfs4proxy ufw curl
 
-# ---------- firewall ----------
+
 log "Configuring UFW (keep SSH)..."
 ufw allow OpenSSH >/dev/null 2>&1 || true
 ufw allow 22/tcp >/dev/null 2>&1 || true
@@ -145,7 +144,6 @@ fi
 ufw allow "${BRIDGE_PORT}/tcp" >/dev/null 2>&1 || true
 ufw reload >/dev/null 2>&1 || true
 
-# ---------- torrc ----------
 PUBLIC_IP="$(get_public_ip)"
 [[ -n "${PUBLIC_IP}" ]] || die "Could not detect public IP (api.ipify.org blocked). Set Address manually in /etc/tor/torrc."
 
@@ -170,16 +168,13 @@ DataDirectory ${DATA_DIR}
 Log notice syslog
 EOF
 
-# ---------- multi-instance (tor@default) ----------
 log "Preparing tor@default (Ubuntu 22.04 multi-instance)..."
 mkdir -p /etc/tor/instances.d
 touch /etc/tor/instances.d/default
 
-# Disable master unit if present (not fatal if already absent)
 systemctl stop tor >/dev/null 2>&1 || true
 systemctl disable tor >/dev/null 2>&1 || true
 
-# Reset pt_state so we always get fresh cert/state for the chosen port
 log "Resetting Tor state (pt_state) and permissions..."
 systemctl stop tor@default >/dev/null 2>&1 || true
 rm -rf "${PT_STATE_DIR}" >/dev/null 2>&1 || true
@@ -189,7 +184,6 @@ log "Starting tor@default (unit may be static; no enable)..."
 systemctl daemon-reload
 systemctl restart tor@default
 
-# ---------- wait for fingerprint + cert ----------
 log "Waiting for Tor to initialize (fingerprint + pt_state)..."
 elapsed=0
 FP=""
@@ -230,7 +224,7 @@ if [[ -z "${CERT}" ]]; then
   die "cert not available."
 fi
 
-# ---------- final single message ----------
+
 echo
 echo "==================== YOUR TOR OBF S4 BRIDGE ===================="
 echo "obfs4 ${PUBLIC_IP}:${BRIDGE_PORT} ${FP} cert=${CERT} iat-mode=${IAT}"
